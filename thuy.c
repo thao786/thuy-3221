@@ -21,7 +21,7 @@ struct Job {
 float lambda, mu;
 int server_count, client_count;
 int begin, end, length;
-struct Job queue[1000];
+struct Job* queue;
 pthread_t *servers, *clients, clock_thread;
 
 void* client() {
@@ -51,8 +51,9 @@ int main(int argc, char **argv)
 {
 	// printf("%s: syst time for children: %d microseconds\n",argv[0],time);
 	server_count = 2, client_count = 2;
-	servers = malloc(server_count*sizeof(pthread_t));
-	clients = malloc(client_count*sizeof(pthread_t));
+	servers = (pthread_t*)malloc(server_count*sizeof(pthread_t));
+	clients = (pthread_t*)malloc(client_count*sizeof(pthread_t));
+	queue = malloc(1000*sizeof(job));
 	begin = 0, end = 0, length = 0;
 	lambda = 0.005, mu = 0.01;
 
@@ -65,12 +66,13 @@ int main(int argc, char **argv)
 
 	// create servers
 	for( i = 0; i < server_count; i = i + 1 ) {
-		pthread_create(&(servers[i]), NULL, &servers, NULL);
+		pthread_create(&(servers[i]), NULL, &server, NULL);
 		pthread_join(servers[i], NULL); 
 	}
 
 	// create clock thread
-	// pthread_create(&clock_thread, NULL, &clock_fn, NULL);
+	pthread_create(&clock_thread, NULL, &clock_fn, NULL);
+	pthread_join(clock_thread, NULL); 
 
 	return 0;
 }
