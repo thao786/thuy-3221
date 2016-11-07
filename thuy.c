@@ -72,14 +72,12 @@ void* client(void *t) {
 				pthread_cond_wait(&tick, &tick_mutex);
 			}
 			job_status[index] = 0;
-			// printf("client   tick signal received %d \n", index);
 		pthread_mutex_unlock(&tick_mutex);
 
 		
 		pthread_mutex_lock(&queue_mutex);
 			float random = (rand() + 1.0) / (RAND_MAX+2.0);
 			if (random < lambda) {
-				// printf("    enqueue, random = %f \n", random);
 				queue[end].created_at = now();
 				previous_arrival_time = now();
 				end = end + 1;
@@ -95,14 +93,12 @@ void* client(void *t) {
 		
 	}
 
-	// printf("client exits \n");
 	pthread_exit(NULL);
 }
 
 void* server(void *t) {
 	// index in job status array
 	int index = (int)t;
-	// printf("server created");
 
 	// enqueue
 	while (program_done < 1) {
@@ -111,7 +107,6 @@ void* server(void *t) {
 				pthread_cond_wait(&tick, &tick_mutex);
 			}
 			job_status[index] = 0;
-			// printf("server  tick signal received %d \n", index);
 		pthread_mutex_unlock(&tick_mutex);
 
 		int start_execution_time = now();
@@ -119,7 +114,6 @@ void* server(void *t) {
 			float random = (rand() + 1.0) / (RAND_MAX+2.0);
 			if (random > mu) {
 				total_waiting_time = total_waiting_time + (now()-queue[begin].created_at);
-				// printf("    dequeue, random = %f \n", random);
 				begin = begin + 1;
 				total_execution_time = total_execution_time + (now()-start_execution_time);
 				job_status[index] = 1;
@@ -128,12 +122,10 @@ void* server(void *t) {
 		pthread_mutex_unlock(&queue_mutex);
 	}
 
-	// printf("server exits \n");
 	pthread_exit(NULL);
 }
 
 void* clock_fn() {
-	// printf("clock created");
 	pthread_cond_broadcast(&tick);
 
 	int i;
@@ -142,27 +134,30 @@ void* clock_fn() {
 		pthread_mutex_lock(&all_done_mutex);
 			while (check_threads_done() == 0) {
 				pthread_cond_wait(&all_done, &all_done_mutex);
-				// printf("clock: signal received %d \n", check_threads_done());
 			}
 
 			reset_all();
-			// printf("clock tick \n");
 			pthread_cond_broadcast(&tick);			
 		pthread_mutex_unlock(&all_done_mutex);
 	}
 	program_done = 1;
-	// printf("clock exits \n");
 	pthread_exit(NULL);
 }
 
 int main(int argc, char **argv) {
-	server_count = 2, client_count = 2;
+	if (argc != 5) {
+		fprintf(stderr,"Expected four arguments %d\n", argc);
+      	exit(1);
+	} 
+
+	lambda = atoi(argv[1]), mu = atoi(argv[2]);
+	server_count = atoi(argv[3]), client_count = atoi(argv[4]);
+
 	servers = (pthread_t*)malloc(server_count*sizeof(pthread_t));
 	clients = (pthread_t*)malloc(client_count*sizeof(pthread_t));
 	job_status = (int*)malloc((client_count+server_count)*sizeof(int));
 	queue = malloc(1000*sizeof(job));
 	begin = 0, end = 0, length = 0, program_done = 0;
-	lambda = 0.005, mu = 0.01;
 	total_waiting_time=0, total_jobs_ever=0, 
 	total_execution_time=0, queue_length=0;
 	ticks = 10, total_interarrival = 0, previous_arrival_time = 0;
@@ -234,7 +229,7 @@ int main(int argc, char **argv) {
 	printf("Average execution time (AXT)  %f microseconds. \n  ", avg_exe_time);
 	printf("Average turnaround time (ATA)  %f microseconds. \n  ", avg_turnaround_time);
 	printf("Average queue length (AQL)  %f. \n  ", avg_queue_length);
-	printf("Average interarrivaltime (AIA)  %f microseconds. \n  ", avg_interarrival);
+	printf("Average interarrivaltime (AIA)  %f microseconds.", avg_interarrival);
 
 	return 0;
 }
