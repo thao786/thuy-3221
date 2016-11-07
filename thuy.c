@@ -175,7 +175,8 @@ int main(int argc, char **argv) {
 	pthread_cond_init(&tick, NULL);
 
 	int i = 0;
-	reset_all();
+	
+	reset_all();  // reset all clients and server to origin
 
 
 	// create clients
@@ -215,11 +216,11 @@ int main(int argc, char **argv) {
 	}
 
 	pthread_mutex_destroy(&queue_mutex);
-    pthread_mutex_destroy(&all_done_mutex);
-    pthread_mutex_destroy(&tick_mutex);
- 
-    pthread_cond_destroy(&all_done);
-    pthread_cond_destroy(&tick);
+	pthread_mutex_destroy(&all_done_mutex);
+	pthread_mutex_destroy(&tick_mutex);
+
+	pthread_cond_destroy(&all_done);
+	pthread_cond_destroy(&tick);
 
     
 	float avg_waiting_time = total_waiting_time / total_jobs_ever;
