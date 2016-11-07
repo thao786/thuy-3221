@@ -36,6 +36,8 @@ long total_waiting_time, total_jobs_ever,
 	total_execution_time, queue_length,
 	total_interarrival, previous_arrival_time;
 
+// check if all clients and server has done with their jobs for the current tick
+// if found any undone job, return 0 right away	
 int check_threads_done() {
 	int i=0;
 	while (i < client_count + server_count) {
@@ -47,6 +49,8 @@ int check_threads_done() {
 	return 1;
 }
 
+// reset all client and server job status to 0
+// get ready for the next tick
 void reset_all() {
 	int i;
 	for(i = 0; i < client_count+server_count; i = i + 1) {
@@ -54,19 +58,21 @@ void reset_all() {
 	}
 }
 
+// get the current microseconds
 long now() {
 	struct timeval now;
 	gettimeofday(&now, NULL);
 	return now.tv_usec;
 }
 
+// function to be executed by all client threads
 void* client(void *t) {
 	// index in job status array
 	int index = (int)t;
-	printf("client created");
 
-	// enqueue
+	// keep going until clock thread stops
 	while (program_done < 1) {
+		// wait for clock to tick
 		pthread_mutex_lock(&tick_mutex);
 			while (job_status[index] == 1) {
 				pthread_cond_wait(&tick, &tick_mutex);
@@ -74,8 +80,9 @@ void* client(void *t) {
 			job_status[index] = 0;
 		pthread_mutex_unlock(&tick_mutex);
 
-		
+		// wait to access job queue
 		pthread_mutex_lock(&queue_mutex);
+			// generate a random between 0 and 1
 			float random = (rand() + 1.0) / (RAND_MAX+2.0);
 			if (random < lambda) {
 				queue[end].created_at = now();
@@ -96,11 +103,12 @@ void* client(void *t) {
 	pthread_exit(NULL);
 }
 
+// function to be executed by all server threads
 void* server(void *t) {
 	// index in job status array
 	int index = (int)t;
 
-	// enqueue
+	// keep going until clock thread stops
 	while (program_done < 1) {
 		pthread_mutex_lock(&tick_mutex);
 			while (job_status[index] == 1) {
@@ -110,7 +118,9 @@ void* server(void *t) {
 		pthread_mutex_unlock(&tick_mutex);
 
 		int start_execution_time = now();
+		// wait to access job queue
 		pthread_mutex_lock(&queue_mutex);
+			// generate a random between 0 and 1
 			float random = (rand() + 1.0) / (RAND_MAX+2.0);
 			if (random > mu) {
 				total_waiting_time = total_waiting_time + (now()-queue[begin].created_at);
@@ -126,42 +136,67 @@ void* server(void *t) {
 }
 
 void* clock_fn() {
+	// initial tick to get out of deadlock
 	pthread_cond_broadcast(&tick);
 
-	int i;
+	int i; // tick 1000 times
 	for( i = 0; i < ticks; i = i + 1 ) {
 		queue_length = queue_length + (end - begin + 1);
 		pthread_mutex_lock(&all_done_mutex);
+			// only tick if all threads are done with their jobs from the previous tick
 			while (check_threads_done() == 0) {
 				pthread_cond_wait(&all_done, &all_done_mutex);
 			}
 
+			// set all job status to 0
 			reset_all();
+
+			// tick
 			pthread_cond_broadcast(&tick);			
 		pthread_mutex_unlock(&all_done_mutex);
 	}
+
+	// the ticking officially ends
 	program_done = 1;
 	pthread_exit(NULL);
 }
 
 int main(int argc, char **argv) {
-	if (argc != 5) {
-		fprintf(stderr,"Expected four arguments %d\n", argc);
-      	exit(1);
-	} 
+	if (argc != 9) {
+		fprintf(stderr,"Error: Expected four arguments, got %d.\n Going to use default values.\n", argc);
+      	lambda = 0.005, mu = 0.01;
+		server_count =2, client_count = 2;
+	} else {
+		int i =0;
+		for(i=1;i<argc;i++) {
+			if (strcmp("--servers", argv[i]) == 0) {
+				server_count = atoi(argv[i + 1]);
+			}
+			if (strcmp("--clients", argv[i]) == 0) {
+				client_count = atoi(argv[i + 1]);
+			}
+			if (strcmp("--lambda", argv[i]) == 0) {
+				lambda = atof(argv[i + 1]);
+			}
+			if (strcmp("--mu", argv[i]) == 0) {
+				mu = atof(argv[i + 1]);
+			}
+		} 
+	}
 
-	lambda = atoi(argv[1]), mu = atoi(argv[2]);
-	server_count = atoi(argv[3]), client_count = atoi(argv[4]);
-
+	// allocate space for arrays
 	servers = (pthread_t*)malloc(server_count*sizeof(pthread_t));
 	clients = (pthread_t*)malloc(client_count*sizeof(pthread_t));
 	job_status = (int*)malloc((client_count+server_count)*sizeof(int));
 	queue = malloc(1000*sizeof(job));
+	
+	// instatiate variable values
 	begin = 0, end = 0, length = 0, program_done = 0;
 	total_waiting_time=0, total_jobs_ever=0, 
 	total_execution_time=0, queue_length=0;
 	ticks = 10, total_interarrival = 0, previous_arrival_time = 0;
 
+	// instantiate mutexes and condition variables
 	pthread_mutex_init(&queue_mutex, NULL);
 	pthread_mutex_init(&all_done_mutex, NULL);
 	pthread_mutex_init(&tick_mutex, NULL);
@@ -170,8 +205,7 @@ int main(int argc, char **argv) {
 	pthread_cond_init(&tick, NULL);
 
 	int i = 0;
-	
-	reset_all();  // reset all clients and server to origin
+	reset_all();  // reset all clients and server to origin state
 
 
 	// create clients
@@ -179,7 +213,7 @@ int main(int argc, char **argv) {
 		int err = pthread_create(&(clients[i]), NULL, client, (void *)(i));
 		if (err != 0) {
 	        printf("Could not create thread. Exit.\n  ");
-	        exit(0);
+	        exit(1);
 	    }
 	}
 
@@ -188,7 +222,7 @@ int main(int argc, char **argv) {
 		int err = pthread_create(&(servers[i]), NULL, &server, (void *)(i + client_count));
 		if (err != 0) {
 	        printf("Could not create thread. Exit.\n  ");
-	        exit(0);
+	        exit(1);
 	    }
 	}
 
@@ -196,7 +230,7 @@ int main(int argc, char **argv) {
 	int err = pthread_create(&clock_thread, NULL, clock_fn, NULL);
 	if (err != 0) {
         printf("Could not create thread. Exit.\n  ");
-        exit(0);
+        exit(1);
     }
 
 	// join all threads
@@ -210,6 +244,7 @@ int main(int argc, char **argv) {
 		pthread_join(servers[i], NULL);
 	}
 
+	// destroy all mutexes and condition variables
 	pthread_mutex_destroy(&queue_mutex);
 	pthread_mutex_destroy(&all_done_mutex);
 	pthread_mutex_destroy(&tick_mutex);
@@ -217,7 +252,7 @@ int main(int argc, char **argv) {
 	pthread_cond_destroy(&all_done);
 	pthread_cond_destroy(&tick);
 
-    
+    // calculate job statistics
 	float avg_waiting_time = total_waiting_time / total_jobs_ever;
 	float avg_exe_time = total_execution_time / total_jobs_ever;
 	float avg_interarrival = total_interarrival / total_jobs_ever;
@@ -229,7 +264,7 @@ int main(int argc, char **argv) {
 	printf("Average execution time (AXT)  %f microseconds. \n  ", avg_exe_time);
 	printf("Average turnaround time (ATA)  %f microseconds. \n  ", avg_turnaround_time);
 	printf("Average queue length (AQL)  %f. \n  ", avg_queue_length);
-	printf("Average interarrivaltime (AIA)  %f microseconds.", avg_interarrival);
+	printf("Average interarrivaltime (AIA)  %f microseconds.\n", avg_interarrival);
 
 	return 0;
 }
