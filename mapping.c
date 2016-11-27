@@ -10,7 +10,7 @@
 
 
 int my_cnt (char *filename) {
-	int fd, offset = 9;
+	int fd;
     char *data;
     struct stat sbuf;
 
@@ -27,7 +27,12 @@ int my_cnt (char *filename) {
 	if ((data = mmap (0, sbuf.st_size, PROT_READ, MAP_SHARED, fd, 0)) == (caddr_t) -1)
 		err_sys ("mmap error.");
 
-    printf("byte at offset %d is '%c'\n", offset, data[offset]);
+    int i=0, count=0;
+    for (i=0; i<sbuf.st_size; i++) {
+    	if (data[i] == '\n') {
+    		count ++;
+    	}
+    }
 
-	return strlen(filename);
+	return count;
 }
