@@ -6,7 +6,7 @@ mapping.so: mapping.c
 reading.so: reading.c
 	gcc -shared -o reading.so -fPIC reading.c
 
-nlcnt: nlcnt.c
+nlcnt: nlcnt.c reading.so mapping.so
 	gcc -o nlcnt nlcnt.c -ldl
 
 clean:
