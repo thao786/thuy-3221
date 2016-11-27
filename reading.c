@@ -14,6 +14,7 @@ int my_cnt (char *filename) {
     char *data = malloc((chunkSize + 1) * sizeof(char));
     struct stat sbuf;
 
+    // check if file can be opened
     if (stat(filename, &sbuf) == -1) {
         perror("stat error.");
         exit(1);
@@ -27,6 +28,8 @@ int my_cnt (char *filename) {
 
 	// round up pages
 	int pages = (sbuf.st_size + chunkSize - 1) / chunkSize;
+
+	// read file by chunks
 	for (j=0; j< pages; j++) {
 		fseek(fp, SEEK_SET, j*chunkSize);
 		int bytesRead = fread(data, chunkSize, 1, fp);

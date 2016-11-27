@@ -4,16 +4,28 @@
 #include <dlfcn.h>
 
 int main (int argc, char *argv[]) {
-  char whichLibrary[] = "ma4pping";
-  char file[] = "/home/thao/thuy/nlcnt.c";
+  char* whichLibrary = malloc(200*sizeof(char));
+  char* file = malloc(200*sizeof(char));
   char* dlfile = malloc(20*sizeof(char));
   void *handle;
   int (*my_cnt)(char*);
 
+  if (argc < 3) {
+    perror("2 arguments required. Exit.");
+    exit(1);
+  }
+
+  whichLibrary = argv[1];
+  file = argv[2];
+
   if (strstr(whichLibrary, "mapping") != NULL) {
     dlfile = "./mapping.so";
-  } else {
+  } 
+  else if (strstr(whichLibrary, "reading") != NULL) {
     dlfile = "./reading.so";
+  } else {
+    perror("no library specified. Exit.");
+    exit(1);
   }
 
   handle = dlopen(dlfile, RTLD_LAZY);
