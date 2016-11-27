@@ -4,7 +4,7 @@
 #include <dlfcn.h>
 
 int main (int argc, char *argv[]) {
-  char whichLibrary[] = "mapping";
+  char whichLibrary[] = "ma4pping";
   char file[] = "/home/thao/thuy/nlcnt.c";
   char* dlfile = malloc(20*sizeof(char));
   void *handle;
